@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI智能制课画布 - 无限画布原型</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* 状态一：任务指令界面 */
+        .mission-briefing {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: all 0.8s ease;
+        }
+
+        .mission-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            padding: 50px;
+            max-width: 800px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .mission-title {
+            font-size: 2.2rem;
+            margin-bottom: 15px;
+            color: #2d3748;
+            font-weight: 700;
+        }
+
+        .mission-subtitle {
+            font-size: 1.1rem;
+            color: #718096;
+            margin-bottom: 40px;
+        }
+
+        .instruction-input {
+            width: 100%;
+            height: 120px;
+            padding: 20px;
+            border: 2px dashed #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            resize: vertical;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .instruction-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .upload-zone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-zone:hover {
+            border-color: #667eea;
+            background-color: #f7fafc;
+        }
+
+        .upload-icon {
+            font-size: 2.5rem;
+            color: #a0aec0;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            color: #718096;
+            margin-bottom: 5px;
+        }
+
+        .file-list {
+            margin-top: 15px;
+            text-align: left;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #f7fafc;
+            border-radius: 6px;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .generate-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px 50px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .generate-btn.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .generate-btn:hover.active {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+        }
+
+        /* 状态二：画布工作区 */
+        .canvas-workspace {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #f8fafc;
+            display: none;
+            overflow: hidden;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+
+        .canvas-container.dragging {
+            cursor: grabbing;
+        }
+
+        .canvas {
+            position: absolute;
+            width: 5000px;
+            height: 5000px;
+            background-image: 
+                radial-gradient(circle, #e2e8f0 1px, transparent 1px);
+            background-size: 50px 50px;
+            background-position: 0 0;
+            transform-origin: 0 0;
+            transition: transform 0.3s ease;
+        }
+
+        /* 画布工具栏 */
+        .canvas-toolbar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 10px;
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .tool-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: #f7fafc;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .tool-btn:hover {
+            background: #e2e8f0;
+            transform: scale(1.05);
+        }
+
+        .tool-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        /* 节点样式 */
+        .node {
+            position: absolute;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-weight: 600;
+            border: 2px solid transparent;
+        }
+
+        .node:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        }
+
+        .node.selected {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .node.dragging {
+            transform: scale(1.1);
+            z-index: 1000;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        /* 根节点 */
+        .node.root {
+            width: 280px;
+            height: 120px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        /* 章节节点 */
+        .node.chapter {
+            width: 200px;
+            height: 80px;
+            background: #e6fffa;
+            color: #234e52;
+            font-size: 14px;
+            border-left: 4px solid #38b2ac;
+        }
+
+        /* 知识点节点 */
+        .node.topic {
+            width: 160px;
+            height: 60px;
+            background: #fff5f5;
+            color: #742a2a;
+            font-size: 12px;
+            border-left: 4px solid #f56565;
+        }
+
+        /* 素材节点 */
+        .asset-node {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: #ffd700;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        /* 连接线 */
+        .connection {
+            position: absolute;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .connection-line {
+            stroke: #cbd5e0;
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead);
+        }
+
+        /* AI工具箱 */
+        .ai-toolbox {
+            position: absolute;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            padding: 20px;
+            width: 320px;
+            z-index: 200;
+            border: 1px solid #e2e8f0;
+            display: none;
+        }
+
+        .toolbox-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #2d3748;
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .quick-action-btn {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            background: #f7fafc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .quick-action-btn:hover {
+            background: #e2e8f0;
+            border-color: #cbd5e0;
+        }
+
+        .micro-chat {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+        }
+
+        .chat-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+            resize: none;
+            margin-bottom: 10px;
+        }
+
+        .chat-send-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* 上下文菜单 */
+        .context-menu {
+            position: absolute;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 8px 0;
+            min-width: 150px;
+            z-index: 300;
+            display: none;
+        }
+
+        .context-menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s ease;
+        }
+
+        .context-menu-item:hover {
+            background: #f7fafc;
+        }
+
+        /* 动画效果 */
+        @keyframes nodeGrow {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.2);
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .node.growing {
+            animation: nodeGrow 0.6s ease-out;
+        }
+
+        @keyframes connectionDraw {
+            0% {
+                stroke-dasharray: 1000;
+                stroke-dashoffset: 1000;
+            }
+            100% {
+                stroke-dasharray: 1000;
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .connection-line.drawing {
+            animation: connectionDraw 0.8s ease-out;
+        }
+
+        /* 隐藏滚动条 */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .mission-card {
+                padding: 30px 20px;
+            }
+            
+            .canvas-toolbar {
+                top: 10px;
+                right: 10px;
+                padding: 8px;
+            }
+            
+            .ai-toolbox {
+                width: 280px;
+                padding: 15px;
+            }
+        }
+
+        /* 工具提示 */
+        .tooltip {
+            position: absolute;
+            background: #2d3748;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .tooltip.show {
+            opacity: 1;
+        }
+
+        /* 加载动画 */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(248, 250, 252, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+            display: none;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #4a5568;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 状态一：任务指令界面 -->
+        <div id="mission-briefing" class="mission-briefing">
+            <div class="mission-card">
+                <h1 class="mission-title">🎨 AI智能制课画布</h1>
+                <p class="mission-subtitle">描述您的培训目标，AI将在画布上生长出完整的课程知识图谱</p>
+                
+                <textarea 
+                    id="instruction-input" 
+                    class="instruction-input" 
+                    placeholder="为新入职的产品经理，制作一门关于团队管理的培训课程，包含沟通技巧、项目管理、团队激励等核心内容，时长90分钟。"
+                ></textarea>
+
+                <div class="upload-zone" id="upload-zone">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">拖拽素材文件到此处或点击上传</div>
+                    <div class="upload-text" style="font-size: 14px; color: #a0aec0;">支持 PPT, PDF, DOCX, TXT 格式</div>
+                    <input type="file" id="file-input" multiple accept=".ppt,.pptx,.pdf,.docx,.txt" style="display: none;">
+                </div>
+
+                <div id="file-list" class="file-list"></div>
+
+                <button id="generate-canvas-btn" class="generate-btn">🚀 在画布上生成课程</button>
+            </div>
+        </div>
+
+        <!-- 状态二：画布工作区 -->
+        <div id="canvas-workspace" class="canvas-workspace">
+            <!-- 画布工具栏 -->
+            <div class="canvas-toolbar">
+                <button class="tool-btn" id="pan-tool" title="平移">✋</button>
+                <button class="tool-btn" id="zoom-in" title="放大">🔍+</button>
+                <button class="tool-btn" id="zoom-out" title="缩小">🔍-</button>
+                <button class="tool-btn" id="fit-screen" title="适应屏幕">📐</button>
+                <button class="tool-btn" id="export-btn" title="导出">💾</button>
+            </div>
+
+            <!-- 画布容器 -->
+            <div id="canvas-container" class="canvas-container">
+                <div id="canvas" class="canvas">
+                    <!-- SVG for connections -->
+                    <svg id="connections-svg" width="5000" height="5000" style="position: absolute; top: 0; left: 0; pointer-events: none;">
+                        <defs>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                                    refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#cbd5e0" />
+                            </marker>
+                        </defs>
+                    </svg>
+                    <!-- 节点将动态插入到这里 -->
+                </div>
+            </div>
+
+            <!-- 加载动画 -->
+            <div id="loading-overlay" class="loading-overlay">
+                <div style="text-align: center;">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">AI正在画布上生成课程结构...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI工具箱 -->
+        <div id="ai-toolbox" class="ai-toolbox">
+            <div class="toolbox-title">🤖 AI协同工具</div>
+            <div class="quick-actions">
+                <button class="quick-action-btn" onclick="quickAction('expand')">📝 扩写内容</button>
+                <button class="quick-action-btn" onclick="quickAction('simplify')">✂️ 精简内容</button>
+                <button class="quick-action-btn" onclick="quickAction('quiz')">❓ 生成测验</button>
+                <button class="quick-action-btn" onclick="quickAction('case')">📚 添加案例</button>
+            </div>
+            <div class="micro-chat">
+                <textarea id="chat-input" class="chat-input" placeholder="对本节有什么具体要求？" rows="2"></textarea>
+                <button class="chat-send-btn" onclick="sendChatMessage()">发送</button>
+            </div>
+        </div>
+
+        <!-- 上下文菜单 -->
+        <div id="context-menu" class="context-menu">
+            <div class="context-menu-item" onclick="contextAction('delete')">🗑️ 删除节点</div>
+            <div class="context-menu-item" onclick="contextAction('duplicate')">📋 复制节点</div>
+            <div class="context-menu-item" onclick="contextAction('addChild')">➕ 添加子节点</div>
+            <div class="context-menu-item" onclick="contextAction('edit')">✏️ 编辑标题</div>
+        </div>
+
+        <!-- 工具提示 -->
+        <div id="tooltip" class="tooltip"></div>
+    </div>
+
+    <script>
+        // 全局状态管理
+        let currentState = 'briefing';
+        let uploadedFiles = [];
+        let canvas = null;
+        let canvasContainer = null;
+        let nodes = [];
+        let connections = [];
+        let selectedNode = null;
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+        let canvasTransform = { x: 0, y: 0, scale: 1 };
+        let isCanvasDragging = false;
+        let canvasDragStart = { x: 0, y: 0 };
+
+        // 课程数据模板
+        const courseData = {
+            title: "产品经理团队管理培训",
+            chapters: [
+                {
+                    title: "第一章：管理认知转变",
+                    topics: [
+                        "1.1 从个人贡献者到管理者",
+                        "1.2 管理者的核心职责",
+                        "1.3 常见管理误区"
+                    ]
+                },
+                {
+                    title: "第二章：高效沟通技巧",
+                    topics: [
+                        "2.1 倾听的艺术",
+                        "2.2 反馈与批评技巧",
+                        "2.3 跨部门沟通策略"
+                    ]
+                },
+                {
+                    title: "第三章：项目管理实践",
+                    topics: [
+                        "3.1 敏捷项目管理",
+                        "3.2 风险识别与控制",
+                        "3.3 里程碑管理"
+                    ]
+                },
+                {
+                    title: "第四章：团队激励与发展",
+                    topics: [
+                        "4.1 激励理论应用",
+                        "4.2 员工发展规划",
+                        "4.3 团队文化建设"
+                    ]
+                }
+            ]
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeEventListeners();
+            canvas = document.getElementById('canvas');
+            canvasContainer = document.getElementById('canvas-container');
+        });
+
+        function initializeEventListeners() {
+            // 文件上传
+            const uploadZone = document.getElementById('upload-zone');
+            const fileInput = document.getElementById('file-input');
+            const instructionInput = document.getElementById('instruction-input');
+            const generateBtn = document.getElementById('generate-canvas-btn');
+
+            uploadZone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            uploadZone.addEventListener('dragover', handleDragOver);
+            uploadZone.addEventListener('drop', handleFileDrop);
+            instructionInput.addEventListener('input', checkFormValidity);
+            generateBtn.addEventListener('click', generateCanvas);
+
+            // 画布工具栏
+            document.getElementById('pan-tool').addEventListener('click', () => setTool('pan'));
+            document.getElementById('zoom-in').addEventListener('click', () => zoomCanvas(1.2));
+            document.getElementById('zoom-out').addEventListener('click', () => zoomCanvas(0.8));
+            document.getElementById('fit-screen').addEventListener('click', fitToScreen);
+            document.getElementById('export-btn').addEventListener('click', exportCanvas);
+
+            // 画布交互
+            canvasContainer.addEventListener('mousedown', handleCanvasMouseDown);
+            canvasContainer.addEventListener('mousemove', handleCanvasMouseMove);
+            canvasContainer.addEventListener('mouseup', handleCanvasMouseUp);
+            canvasContainer.addEventListener('wheel', handleCanvasWheel);
+
+            // 全局事件
+            document.addEventListener('click', handleGlobalClick);
+            document.addEventListener('contextmenu', handleContextMenu);
+            document.addEventListener('keydown', handleKeyDown);
+        }
+
+        // 文件处理
+        function handleFileSelect(e) {
+            const files = Array.from(e.target.files);
+            addFiles(files);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleFileDrop(e) {
+            e.preventDefault();
+            const files = Array.from(e.dataTransfer.files);
+            addFiles(files);
+        }
+
+        function addFiles(files) {
+            files.forEach(file => {
+                if (isValidFileType(file)) {
+                    uploadedFiles.push({
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        id: Date.now() + Math.random()
+                    });
+                }
+            });
+            renderFileList();
+            checkFormValidity();
+        }
+
+        function isValidFileType(file) {
+            return file.name.match(/\.(pdf|ppt|pptx|doc|docx|txt)$/i);
+        }
+
+        function renderFileList() {
+            const fileList = document.getElementById('file-list');
+            fileList.innerHTML = uploadedFiles.map(file => `
+                <div class="file-item">
+                    <span>${getFileIcon(file.name)} ${file.name}</span>
+                    <span style="cursor: pointer;" onclick="removeFile('${file.id}')">🗑️</span>
+                </div>
+            `).join('');
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = { 'pdf': '📄', 'ppt': '📊', 'pptx': '📊', 'doc': '📝', 'docx': '📝', 'txt': '📃' };
+            return icons[ext] || '📁';
+        }
+
+        function removeFile(fileId) {
+            uploadedFiles = uploadedFiles.filter(file => file.id !== fileId);
+            renderFileList();
+            checkFormValidity();
+        }
+
+        function checkFormValidity() {
+            const instruction = document.getElementById('instruction-input').value.trim();
+            const generateBtn = document.getElementById('generate-canvas-btn');
+            
+            if (instruction || uploadedFiles.length > 0) {
+                generateBtn.classList.add('active');
+            } else {
+                generateBtn.classList.remove('active');
+            }
+        }
+
+        // 生成画布
+        function generateCanvas() {
+            if (!document.getElementById('generate-canvas-btn').classList.contains('active')) {
+                return;
+            }
+
+            // 切换到画布状态
+            document.getElementById('mission-briefing').style.display = 'none';
+            document.getElementById('canvas-workspace').style.display = 'block';
+            document.getElementById('loading-overlay').style.display = 'flex';
+
+            // 模拟生成过程
+            setTimeout(() => {
+                document.getElementById('loading-overlay').style.display = 'none';
+                createCourseNodes();
+            }, 2000);
+
+            currentState = 'canvas';
+        }
+
+        // 创建课程节点
+        function createCourseNodes() {
+            nodes = [];
+            connections = [];
+
+            // 创建根节点
+            const rootNode = createNode('root', courseData.title, 2500, 2000, {
+                width: 280,
+                height: 120
+            });
+            nodes.push(rootNode);
+
+            let chapterY = 2200;
+            const chapterSpacing = 300;
+
+            // 创建章节节点
+            courseData.chapters.forEach((chapter, chapterIndex) => {
+                const chapterX = 2200 + (chapterIndex % 2) * 600;
+                const chapterNode = createNode('chapter', chapter.title, chapterX, chapterY, {
+                    width: 200,
+                    height: 80,
+                    chapterIndex
+                });
+                nodes.push(chapterNode);
+
+                // 创建连接线
+                connections.push({
+                    from: rootNode,
+                    to: chapterNode
+                });
+
+                // 创建知识点节点
+                let topicY = chapterY + 150;
+                chapter.topics.forEach((topic, topicIndex) => {
+                    const topicX = chapterX + (topicIndex % 2 === 0 ? -100 : 100);
+                    const topicNode = createNode('topic', topic, topicX, topicY, {
+                        width: 160,
+                        height: 60,
+                        chapterIndex,
+                        topicIndex
+                    });
+                    nodes.push(topicNode);
+
+                    // 创建连接线
+                    connections.push({
+                        from: chapterNode,
+                        to: topicNode
+                    });
+
+                    // 添加素材节点（随机）
+                    if (Math.random() > 0.6 && uploadedFiles.length > 0) {
+                        const assetNode = createAssetNode(topicX + 80, topicY - 15, uploadedFiles[0]);
+                        canvas.appendChild(assetNode);
+                    }
+
+                    topicY += 100;
+                });
+
+                chapterY += chapterSpacing;
+            });
+
+            // 渲染节点和连接线
+            renderNodes();
+            renderConnections();
+        }
+
+        function createNode(type, title, x, y, options = {}) {
+            const node = document.createElement('div');
+            node.className = `node ${type} growing`;
+            node.textContent = title;
+            node.style.left = x + 'px';
+            node.style.top = y + 'px';
+            
+            if (options.width) node.style.width = options.width + 'px';
+            if (options.height) node.style.height = options.height + 'px';
+
+            node.dataset.type = type;
+            node.dataset.title = title;
+            node.dataset.x = x;
+            node.dataset.y = y;
+            node.dataset.chapterIndex = options.chapterIndex || '';
+            node.dataset.topicIndex = options.topicIndex || '';
+
+            // 添加事件监听
+            node.addEventListener('mousedown', handleNodeMouseDown);
+            node.addEventListener('click', handleNodeClick);
+            node.addEventListener('dblclick', handleNodeDoubleClick);
+
+            return node;
+        }
+
+        function createAssetNode(x, y, file) {
+            const assetNode = document.createElement('div');
+            assetNode.className = 'asset-node';
+            assetNode.textContent = getFileIcon(file.name);
+            assetNode.style.left = x + 'px';
+            assetNode.style.top = y + 'px';
+            assetNode.title = `来源: ${file.name}`;
+            return assetNode;
+        }
+
+        function renderNodes() {
+            nodes.forEach((node, index) => {
+                setTimeout(() => {
+                    canvas.appendChild(node);
+                }, index * 200);
+            });
+        }
+
+        function renderConnections() {
+            const svg = document.getElementById('connections-svg');
+            
+            connections.forEach((conn, index) => {
+                setTimeout(() => {
+                    const line = createConnectionLine(conn.from, conn.to);
+                    svg.appendChild(line);
+                }, (nodes.length + index) * 100);
+            });
+        }
+
+        function createConnectionLine(fromNode, toNode) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            line.classList.add('connection-line', 'drawing');
+            
+            const fromRect = fromNode.getBoundingClientRect();
+            const toRect = toNode.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            
+            const fromX = parseInt(fromNode.dataset.x) + parseInt(fromNode.style.width || 200) / 2;
+            const fromY = parseInt(fromNode.dataset.y) + parseInt(fromNode.style.height || 80);
+            const toX = parseInt(toNode.dataset.x) + parseInt(toNode.style.width || 160) / 2;
+            const toY = parseInt(toNode.dataset.y);
+            
+            const midY = fromY + (toY - fromY) / 2;
+            
+            const d = `M ${fromX} ${fromY} Q ${fromX} ${midY} ${toX} ${toY}`;
+            line.setAttribute('d', d);
+            
+            return line;
+        }
+
+        // 节点交互
+        function handleNodeMouseDown(e) {
+            e.stopPropagation();
+            if (e.button === 0) { // 左键
+                isDragging = true;
+                selectedNode = e.currentTarget;
+                selectedNode.classList.add('dragging');
+                
+                const rect = selectedNode.getBoundingClientRect();
+                const canvasRect = canvas.getBoundingClientRect();
+                dragOffset.x = e.clientX - rect.left;
+                dragOffset.y = e.clientY - rect.top;
+            }
+        }
+
+        function handleNodeClick(e) {
+            e.stopPropagation();
+            if (!isDragging) {
+                selectNode(e.currentTarget);
+                showAIToolbox(e.currentTarget);
+            }
+        }
+
+        function handleNodeDoubleClick(e) {
+            e.stopPropagation();
+            editNodeTitle(e.currentTarget);
+        }
+
+        function selectNode(node) {
+            // 清除之前的选择
+            nodes.forEach(n => n.classList.remove('selected'));
+            
+            // 选择新节点
+            node.classList.add('selected');
+            selectedNode = node;
+        }
+
+        function showAIToolbox(node) {
+            const toolbox = document.getElementById('ai-toolbox');
+            const rect = node.getBoundingClientRect();
+            
+            toolbox.style.left = (rect.right + 20) + 'px';
+            toolbox.style.top = rect.top + 'px';
+            toolbox.style.display = 'block';
+            
+            // 更新工具箱标题
+            const title = toolbox.querySelector('.toolbox-title');
+            title.textContent = `🤖 ${node.dataset.title}`;
+        }
+
+        function editNodeTitle(node) {
+            const currentTitle = node.textContent;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentTitle;
+            input.style.cssText = `
+                width: 100%;
+                height: 100%;
+                border: none;
+                background: transparent;
+                text-align: center;
+                font-weight: 600;
+                font-size: inherit;
+                color: inherit;
+            `;
+            
+            node.innerHTML = '';
+            node.appendChild(input);
+            input.focus();
+            input.select();
+            
+            const finishEdit = () => {
+                const newTitle = input.value.trim() || currentTitle;
+                node.textContent = newTitle;
+                node.dataset.title = newTitle;
+            };
+            
+            input.addEventListener('blur', finishEdit);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    finishEdit();
+                } else if (e.key === 'Escape') {
+                    node.textContent = currentTitle;
+                }
+            });
+        }
+
+        // 画布交互
+        function handleCanvasMouseDown(e) {
+            if (e.target === canvasContainer || e.target === canvas) {
+                isCanvasDragging = true;
+                canvasContainer.classList.add('dragging');
+                canvasDragStart.x = e.clientX - canvasTransform.x;
+                canvasDragStart.y = e.clientY - canvasTransform.y;
+                
+                // 隐藏AI工具箱
+                document.getElementById('ai-toolbox').style.display = 'none';
+            }
+        }
+
+        function handleCanvasMouseMove(e) {
+            if (isDragging && selectedNode) {
+                // 拖拽节点
+                const canvasRect = canvas.getBoundingClientRect();
+                const x = (e.clientX - canvasRect.left - dragOffset.x) / canvasTransform.scale;
+                const y = (e.clientY - canvasRect.top - dragOffset.y) / canvasTransform.scale;
+                
+                selectedNode.style.left = x + 'px';
+                selectedNode.style.top = y + 'px';
+                selectedNode.dataset.x = x;
+                selectedNode.dataset.y = y;
+                
+                // 更新连接线
+                updateConnections();
+                
+            } else if (isCanvasDragging) {
+                // 拖拽画布
+                canvasTransform.x = e.clientX - canvasDragStart.x;
+                canvasTransform.y = e.clientY - canvasDragStart.y;
+                updateCanvasTransform();
+            }
+        }
+
+        function handleCanvasMouseUp(e) {
+            if (isDragging) {
+                isDragging = false;
+                if (selectedNode) {
+                    selectedNode.classList.remove('dragging');
+                }
+            }
+            
+            if (isCanvasDragging) {
+                isCanvasDragging = false;
+                canvasContainer.classList.remove('dragging');
+            }
+        }
+
+        function handleCanvasWheel(e) {
+            e.preventDefault();
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            zoomCanvas(zoomFactor, e.clientX, e.clientY);
+        }
+
+        function zoomCanvas(factor, centerX, centerY) {
+            const oldScale = canvasTransform.scale;
+            canvasTransform.scale = Math.max(0.1, Math.min(3, canvasTransform.scale * factor));
+            
+            if (centerX && centerY) {
+                const scaleChange = canvasTransform.scale - oldScale;
+                canvasTransform.x -= (centerX - canvasTransform.x) * scaleChange / oldScale;
+                canvasTransform.y -= (centerY - canvasTransform.y) * scaleChange / oldScale;
+            }
+            
+            updateCanvasTransform();
+        }
+
+        function updateCanvasTransform() {
+            canvas.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`;
+        }
+
+        function fitToScreen() {
+            if (nodes.length === 0) return;
+            
+            // 计算所有节点的边界
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            
+            nodes.forEach(node => {
+                const x = parseInt(node.dataset.x);
+                const y = parseInt(node.dataset.y);
+                const width = parseInt(node.style.width || 200);
+                const height = parseInt(node.style.height || 80);
+                
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x + width);
+                maxY = Math.max(maxY, y + height);
+            });
+            
+            const contentWidth = maxX - minX;
+            const contentHeight = maxY - minY;
+            const containerWidth = canvasContainer.clientWidth;
+            const containerHeight = canvasContainer.clientHeight;
+            
+            const scaleX = (containerWidth - 100) / contentWidth;
+            const scaleY = (containerHeight - 100) / contentHeight;
+            canvasTransform.scale = Math.min(scaleX, scaleY, 1);
+            
+            canvasTransform.x = (containerWidth - contentWidth * canvasTransform.scale) / 2 - minX * canvasTransform.scale;
+            canvasTransform.y = (containerHeight - contentHeight * canvasTransform.scale) / 2 - minY * canvasTransform.scale;
+            
+            updateCanvasTransform();
+        }
+
+        function updateConnections() {
+            const svg = document.getElementById('connections-svg');
+            svg.innerHTML = `
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                            refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#cbd5e0" />
+                    </marker>
+                </defs>
+            `;
+            
+            connections.forEach(conn => {
+                const line = createConnectionLine(conn.from, conn.to);
+                svg.appendChild(line);
+            });
+        }
+
+        // AI工具箱功能
+        function quickAction(action) {
+            if (!selectedNode) return;
+            
+            const actions = {
+                'expand': '正在为该节点扩写详细内容...',
+                'simplify': '正在精简该节点内容...',
+                'quiz': '正在生成相关测验题目...',
+                'case': '正在从素材库查找相关案例...'
+            };
+            
+            showTooltip(actions[action], selectedNode);
+            
+            // 模拟AI处理
+            setTimeout(() => {
+                if (action === 'expand') {
+                    // 添加子节点示例
+                    addChildNode(selectedNode, '详细内容点');
+                } else if (action === 'quiz') {
+                    alert('已为该节点生成3道测验题目！');
+                }
+            }, 1500);
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message || !selectedNode) return;
+            
+            showTooltip(`AI正在处理: ${message}`, selectedNode);
+            input.value = '';
+            
+            // 模拟AI响应
+            setTimeout(() => {
+                showTooltip('内容已更新，请查看节点变化', selectedNode);
+            }, 1500);
+        }
+
+        function addChildNode(parentNode, title) {
+            const parentX = parseInt(parentNode.dataset.x);
+            const parentY = parseInt(parentNode.dataset.y);
+            const parentHeight = parseInt(parentNode.style.height || 80);
+            
+            const childNode = createNode('topic', title, parentX + 50, parentY + parentHeight + 50, {
+                width: 160,
+                height: 60
+            });
+            
+            nodes.push(childNode);
+            canvas.appendChild(childNode);
+            
+            connections.push({
+                from: parentNode,
+                to: childNode
+            });
+            
+            updateConnections();
+        }
+
+        // 上下文菜单
+        function handleContextMenu(e) {
+            if (e.target.classList.contains('node')) {
+                e.preventDefault();
+                selectedNode = e.target;
+                showContextMenu(e.clientX, e.clientY);
+            }
+        }
+
+        function showContextMenu(x, y) {
+            const menu = document.getElementById('context-menu');
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+            menu.style.display = 'block';
+        }
+
+        function contextAction(action) {
+            document.getElementById('context-menu').style.display = 'none';
+            
+            if (!selectedNode) return;
+            
+            switch (action) {
+                case 'delete':
+                    deleteNode(selectedNode);
+                    break;
+                case 'duplicate':
+                    duplicateNode(selectedNode);
+                    break;
+                case 'addChild':
+                    addChildNode(selectedNode, '新子节点');
+                    break;
+                case 'edit':
+                    editNodeTitle(selectedNode);
+                    break;
+            }
+        }
+
+        function deleteNode(node) {
+            if (node.dataset.type === 'root') {
+                alert('不能删除根节点！');
+                return;
+            }
+            
+            // 移除节点
+            const index = nodes.indexOf(node);
+            if (index > -1) {
+                nodes.splice(index, 1);
+            }
+            
+            // 移除相关连接
+            connections = connections.filter(conn => 
+                conn.from !== node && conn.to !== node
+            );
+            
+            node.remove();
+            updateConnections();
+            
+            document.getElementById('ai-toolbox').style.display = 'none';
+        }
+
+        function duplicateNode(node) {
+            const newNode = createNode(
+                node.dataset.type,
+                node.dataset.title + ' (副本)',
+                parseInt(node.dataset.x) + 50,
+                parseInt(node.dataset.y) + 50,
+                {
+                    width: parseInt(node.style.width),
+                    height: parseInt(node.style.height)
+                }
+            );
+            
+            nodes.push(newNode);
+            canvas.appendChild(newNode);
+        }
+
+        // 全局事件处理
+        function handleGlobalClick(e) {
+            if (!e.target.closest('.ai-toolbox') && !e.target.classList.contains('node')) {
+                document.getElementById('ai-toolbox').style.display = 'none';
+            }
+            
+            if (!e.target.closest('.context-menu')) {
+                document.getElementById('context-menu').style.display = 'none';
+            }
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'Delete' && selectedNode) {
+                deleteNode(selectedNode);
+            } else if (e.key === 'Escape') {
+                document.getElementById('ai-toolbox').style.display = 'none';
+                document.getElementById('context-menu').style.display = 'none';
+            }
+        }
+
+        // 工具函数
+        function showTooltip(text, targetElement) {
+            const tooltip = document.getElementById('tooltip');
+            const rect = targetElement.getBoundingClientRect();
+            
+            tooltip.textContent = text;
+            tooltip.style.left = rect.right + 10 + 'px';
+            tooltip.style.top = rect.top + 'px';
+            tooltip.classList.add('show');
+            
+            setTimeout(() => {
+                tooltip.classList.remove('show');
+            }, 3000);
+        }
+
+        function setTool(tool) {
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tool + '-tool').classList.add('active');
+        }
+
+        function exportCanvas() {
+            alert('画布导出功能：可导出为PNG图片、PDF文档或JSON数据格式。\n\n（演示版本暂不支持实际导出）');
+        }
+
+        // 初始化演示数据
+        setTimeout(() => {
+            // 预填充演示指令
+            document.getElementById('instruction-input').value = '为新入职的产品经理，制作一门关于团队管理的培训课程，包含沟通技巧、项目管理、团队激励等核心内容，时长90分钟。';
+            
+            // 添加演示文件
+            uploadedFiles = [
+                { id: 'demo1', name: '团队管理手册.pdf', size: 2048000, type: 'application/pdf' },
+                { id: 'demo2', name: '项目管理模板.pptx', size: 1536000, type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }
+            ];
+            
+            renderFileList();
+            checkFormValidity();
+        }, 500);
+    </script>
+</body>
+</html>
