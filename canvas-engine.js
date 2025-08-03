@@ -9,6 +9,7 @@ class CanvasEngine {
     this.transform = { x: 0, y: 0, scale: 1 };
     this.isDragging = false;
     this.dragOffset = { x: 0, y: 0 };
+    this.dragStartPos = null; // 拖动起始位置
     this.isCanvasDragging = false;
     this.canvasDragStart = { x: 0, y: 0 };
 
@@ -76,7 +77,17 @@ class CanvasEngine {
   createNode(type, title, x, y, options = {}) {
     const node = document.createElement("div");
     node.className = `node ${type}`;
-    node.textContent = title;
+    
+    // 创建节点内容结构
+    const nodeContent = document.createElement("div");
+    nodeContent.className = "node-content";
+    
+    const nodeText = document.createElement("span");
+    nodeText.className = "node-text";
+    nodeText.textContent = title;
+    
+    nodeContent.appendChild(nodeText);
+    node.appendChild(nodeContent);
 
     // 设置位置和大小
     node.style.left = x + "px";
@@ -97,13 +108,56 @@ class CanvasEngine {
     // 添加事件监听
     node.addEventListener("mousedown", this.handleNodeMouseDown.bind(this));
     node.addEventListener("click", this.handleNodeClick.bind(this));
-    node.addEventListener("dblclick", this.handleNodeDoubleClick.bind(this));
     node.addEventListener("contextmenu", this.handleNodeContextMenu.bind(this));
+    node.addEventListener("dblclick", this.handleNodeDoubleClick.bind(this));
 
     return node;
   }
 
+  // 创建带溯源信息的节点
+  createNodeWithSource(type, title, x, y, options = {}, sources = []) {
+    const node = this.createNode(type, title, x, y, options);
+    
+    // 添加溯源信息
+    if (sources && sources.length > 0) {
+      node.dataset.sources = JSON.stringify(sources);
+      
+      // 添加溯源指示器
+      const sourceIndicator = document.createElement("div");
+      sourceIndicator.className = "source-indicator";
+      sourceIndicator.innerHTML = "🔗";
+      sourceIndicator.title = `来源: ${sources.length}个文档片段`;
+      
+      const nodeContent = node.querySelector('.node-content');
+      nodeContent.appendChild(sourceIndicator);
+    }
+    
+    return node;
+  }
+
+  // 清空画布
+  clear() {
+    console.log('清空画布，当前节点数量:', this.nodes.length);
+    
+    this.nodes.forEach(node => {
+      if (node && node.parentNode) {
+        node.parentNode.removeChild(node);
+      }
+    });
+    this.nodes = [];
+    this.connections = [];
+    
+    // 清空SVG连接线
+    if (this.svg) {
+      const paths = this.svg.querySelectorAll('path');
+      paths.forEach(path => path.remove());
+    }
+    
+    console.log('画布已清空，节点数量:', this.nodes.length);
+  }
+
   addNode(node, parentNode = null) {
+    console.log('添加节点:', node.dataset.title || '未知', '当前节点总数:', this.nodes.length);
     this.nodes.push(node);
     this.canvas.appendChild(node);
 
@@ -138,6 +192,10 @@ class CanvasEngine {
     // 创建路径
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.classList.add("connection-line");
+    
+    // 添加唯一ID用于识别连接线
+    const connectionId = this.getConnectionId(connection.from, connection.to);
+    path.setAttribute("data-connection", connectionId);
 
     // 使用贝塞尔曲线
     const midY = fromY + (toY - fromY) / 2;
@@ -171,6 +229,37 @@ class CanvasEngine {
     this.connections.forEach((connection) => {
       this.renderConnection(connection);
     });
+  }
+
+  // 只更新特定节点相关的连接线
+  updateNodeConnections(node) {
+    if (!node) return;
+    
+    // 找到与该节点相关的连接
+    const relatedConnections = this.connections.filter(
+      (conn) => conn.from === node || conn.to === node
+    );
+    
+    // 只删除与该节点相关的连接线
+    relatedConnections.forEach((connection) => {
+      const connectionId = this.getConnectionId(connection.from, connection.to);
+      const existingLine = this.svg.querySelector(`[data-connection="${connectionId}"]`);
+      if (existingLine) {
+        existingLine.remove();
+      }
+    });
+    
+    // 重新绘制这些连接线
+    relatedConnections.forEach((connection) => {
+      this.renderConnection(connection);
+    });
+  }
+
+  // 生成连接线的唯一ID
+  getConnectionId(fromNode, toNode) {
+    const fromId = fromNode.dataset.id || fromNode.dataset.title;
+    const toId = toNode.dataset.id || toNode.dataset.title;
+    return `${fromId}-${toId}`;
   }
 
   selectNode(node) {
@@ -308,12 +397,24 @@ class CanvasEngine {
       this.canvasDragStart.x = e.clientX - this.transform.x;
       this.canvasDragStart.y = e.clientY - this.transform.y;
 
-      // 隐藏工具箱
-      window.hideAIToolbox();
+      // 隐藏工具箱 - 移除全局函数调用
     }
   }
 
   handleMouseMove(e) {
+    // 检查是否应该开始拖动（鼠标移动超过阈值）
+    if (!this.isDragging && this.selectedNode && this.dragStartPos) {
+      const dragThreshold = 5; // 5像素的拖动阈值
+      const deltaX = Math.abs(e.clientX - this.dragStartPos.x);
+      const deltaY = Math.abs(e.clientY - this.dragStartPos.y);
+      
+      if (deltaX > dragThreshold || deltaY > dragThreshold) {
+        // 开始拖动
+        this.isDragging = true;
+        this.selectedNode.classList.add("dragging");
+      }
+    }
+    
     if (this.isDragging && this.selectedNode) {
       // 拖拽节点
       const containerRect = this.container.getBoundingClientRect();
@@ -332,7 +433,8 @@ class CanvasEngine {
       this.selectedNode.dataset.x = x;
       this.selectedNode.dataset.y = y;
 
-      this.updateConnections();
+      // 只更新与当前节点相关的连接线，而不是所有连接线
+      this.updateNodeConnections(this.selectedNode);
     } else if (this.isCanvasDragging) {
       // 拖拽画布
       this.transform.x = e.clientX - this.canvasDragStart.x;
@@ -353,7 +455,14 @@ class CanvasEngine {
       this.isCanvasDragging = false;
       this.container.classList.remove("dragging");
     }
+    
+    // 清理拖动起始位置
+    this.dragStartPos = null;
   }
+
+  // 节点右键点击处理已合并到handleNodeContextMenu
+
+  // 节点点击处理 - 已移除重复函数，使用下方的改进版本
 
   handleWheel(e) {
     e.preventDefault();
@@ -364,10 +473,10 @@ class CanvasEngine {
   handleNodeMouseDown(e) {
     e.stopPropagation();
     if (e.button === 0) {
-      // 左键
-      this.isDragging = true;
+      // 左键 - 记录鼠标按下位置，但不立即设置为拖动状态
+      this.isDragging = false; // 重要：初始不是拖动状态
+      this.dragStartPos = { x: e.clientX, y: e.clientY }; // 记录起始位置
       this.selectNode(e.currentTarget);
-      e.currentTarget.classList.add("dragging");
 
       const rect = e.currentTarget.getBoundingClientRect();
       const containerRect = this.container.getBoundingClientRect();
@@ -380,20 +489,32 @@ class CanvasEngine {
     e.stopPropagation();
     if (!this.isDragging) {
       this.selectNode(e.currentTarget);
-      window.showAIToolbox(e.currentTarget);
+      // 移除全局函数调用，使用回调机制
+      if (this.onNodeClick) {
+        this.onNodeClick(e.currentTarget);
+      }
     }
   }
 
   handleNodeDoubleClick(e) {
     e.stopPropagation();
-    window.editNodeTitle(e.currentTarget);
+    // 双击编辑功能通过回调处理
+    if (this.onNodeDoubleClick) {
+      this.onNodeDoubleClick(e.currentTarget);
+    } else if (this.onNodeClick) {
+      // 如果没有双击回调，当作单击处理
+      this.onNodeClick(e.currentTarget);
+    }
   }
 
   handleNodeContextMenu(e) {
     e.preventDefault();
     e.stopPropagation();
     this.selectNode(e.currentTarget);
-    window.showContextMenu(e.clientX, e.clientY);
+    // 使用现有的右键回调机制
+    if (this.onNodeRightClick) {
+      this.onNodeRightClick(e.currentTarget, e);
+    }
   }
 }
 
