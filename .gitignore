@@ -1,2 +1,4 @@
 /templates/node_modules
 # Ignore node_modules directory
+/templates/out
+/templates/.next

@@ -1,4 +1,4 @@
-// File: C:\Users\nattin\Desktop\瞬有有\src\AI-\templates\app\canvas\page.tsx
+// File: C:\Users\nattin\Desktop\shunyouyou\src\AI-\templates\app\canvas\page.tsx
 import * as entry from '../../../../app/canvas/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

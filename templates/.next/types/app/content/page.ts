@@ -1,4 +1,4 @@
-// File: C:\Users\nattin\Desktop\瞬有有\src\AI-\templates\app\content\page.tsx
+// File: C:\Users\nattin\Desktop\shunyouyou\src\AI-\templates\app\content\page.tsx
 import * as entry from '../../../../app/content/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
